@@ -78,5 +78,25 @@ return [
      * use the full or partial route name as index
      * and a priority number between 0 and 1
      */
-    'routePriorities' => []
+    'routePriorities' => [],
+
+    /**
+     * Enable or disable schedule for the job
+     * If set to true the sitemap generator will be run
+     * using the 'cron' instruction
+     */
+    'schedule' => false,
+
+    /**
+     * If you want to set specific
+     * instruction for when to schedule job
+     * you can set this with a cron instruction
+     * You can generate one using https://crontab.guru/
+     * https://laravel.com/docs/8.x/scheduling#schedule-frequency-options
+     *
+     * schedule must be set to true
+     *
+     * Default is every day at 15:45
+     */
+    'cron' => '45 15 * * *'
 ];
