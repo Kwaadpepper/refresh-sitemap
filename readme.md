@@ -1,9 +1,7 @@
-# Exception Handler
+# Refresh Sitemap
 
 [![Latest Version on Packagist][ico-version]][link-packagist]
 [![Total Downloads][ico-downloads]][link-downloads]
-[![Build Status][ico-travis]][link-travis]
-[![StyleCI][ico-styleci]][link-styleci]
 
 Creates sitemap.xml and refresh using a config file
 
@@ -17,11 +15,10 @@ $ composer require kwaadpepper/refresh-sitemap
 
 ## Usage
 
-1 - php artisan handler:install
+1 - `php artisan vendor:publish --provider="Kwaadpepper\RefreshSitemap\RefreshSitemapServiceProvider"`
 2 - Change configuration in config/refresh-sitemap.php
-3 - put at least your team email in the above file in `contactsList` array
+3 - You can test your configuration using `php artisan sitemap:refresh --dry-run`
 
-You can uninstall it by using php artisan handler:remove or juste revert changes in Exception/Handler.php
 ## Change log
 
 Please see the [changelog](changelog.md) for more information on what has changed recently.
