@@ -8,10 +8,11 @@ use Illuminate\Support\Facades\Schema;
 
 trait SitemapRouteConditions
 {
-
     /**
      * List eloquent condition to decide whether
      * a route should appear in the sitemap or not
+     *
+     * @var array<string,string>
      */
     private static $queryConditions = [];
 
@@ -19,25 +20,26 @@ trait SitemapRouteConditions
      * List of routes that should be ignored
      * when generating sitemap
      *
-     * @var array
+     * @var array<string>
      */
     private static $ignoreRoutes = [];
 
     /**
      * Init variables from configuration
+     *
+     * @return void
      */
-    private static function initConfigConditions()
+    private static function initConfigConditions(): void
     {
-        self::$ignoreRoutes = \config('refresh-sitemap.ignoreRoutes', self::$ignoreRoutes);
+        self::$ignoreRoutes    = \config('refresh-sitemap.ignoreRoutes', self::$ignoreRoutes);
         self::$queryConditions = \config('refresh-sitemap.queryConditions', self::$queryConditions);
     }
 
     /**
      * Add query conditions using the config table
      * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $modelTable
+     * @param string                                $modelTable
      * @return void
-     * @throws \InvalidArgumentException
      */
     private static function queryConditions(Builder &$query, string $modelTable): void
     {

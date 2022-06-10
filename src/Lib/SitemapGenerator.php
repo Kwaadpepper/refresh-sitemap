@@ -11,13 +11,11 @@ use Kwaadpepper\RefreshSitemap\Exceptions\SitemapException;
 use Kwaadpepper\RefreshSitemap\Traits\SitemapRouteBinder;
 use Kwaadpepper\RefreshSitemap\Traits\SitemapRouteConditions;
 use Kwaadpepper\RefreshSitemap\Traits\SitemapRouteInfos;
-use ReflectionClass;
 use Spatie\Sitemap\Sitemap;
 use Spatie\Sitemap\Tags\Url;
 
 final class SitemapGenerator
 {
-
     use SitemapRouteBinder;
     use SitemapRouteConditions;
     use SitemapRouteInfos;
@@ -25,6 +23,9 @@ final class SitemapGenerator
     /** @var \Spatie\Sitemap\Sitemap */
     private $siteMap = null;
 
+    /**
+     * SitemapGenerator
+     */
     public function __construct()
     {
         $this->siteMap = Sitemap::create();
@@ -34,7 +35,7 @@ final class SitemapGenerator
      * Generate the sitemap Xml
      *
      * @return string An xml file
-     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException
+     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException If generating fails.
      */
     public function generateSiteMap(): string
     {
@@ -47,8 +48,7 @@ final class SitemapGenerator
      *
      * @param string $path
      * @return \Spatie\Sitemap\Sitemap
-     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException If generating fails.
      */
     public function writeToFile(string $path): Sitemap
     {
@@ -62,7 +62,7 @@ final class SitemapGenerator
      * Actually generate the sitemap
      *
      * @return void
-     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException
+     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException If generating fails.
      */
     private function generate(): void
     {
@@ -70,6 +70,10 @@ final class SitemapGenerator
         $this->assertRouteBinderIsCorrect();
 
         $routeCollection = Route::getRoutes();
+
+        /**
+         * @var array<array<int,string|float>>
+         */
         $generatedUris = [];
 
         /** @var \Illuminate\Routing\Route $route */
@@ -86,15 +90,17 @@ final class SitemapGenerator
         }
 
         foreach ($generatedUris as $smRules) {
-            $this->siteMap->add(Url::create($smRules[0])
+            $this->siteMap->add(Url::create(\strval($smRules[0]))
                 ->setLastModificationDate(Carbon::yesterday())
-                ->setChangeFrequency($smRules[1])
-                ->setPriority($smRules[2]));
+                ->setChangeFrequency(\strval($smRules[1]))
+                ->setPriority(\floatval($smRules[2])));
         }
     }
 
     /**
      * Init variables from configuration
+     *
+     * @return void
      */
     private static function initConfig(): void
     {
@@ -103,29 +109,37 @@ final class SitemapGenerator
         self::initConfigInfo();
     }
 
-    private function handleRoute(RoutingRoute $route, array &$generatedUris)
+    /**
+     * Undocumented function
+     *
+     * @param \Illuminate\Routing\Route         $route
+     * @param array<array[string,string,float]> $generatedUris
+     * @return void
+     */
+    private function handleRoute(\Illuminate\Routing\Route $route, array &$generatedUris): void
     {
         /** @var array to be populated with models from DB to generate a route */
         $rParams = [];
 
-        /** @var \array [lluminate\Routing\Route::signatureParameters] parameters signature from the controller */
+        /** @var array<\ReflectionParameter> parameters signature from the controller */
         $params = $route->signatureParameters();
-        /** @var \array [Illuminate\Routing\Route::parameterNames] parameters name from the registered route */
+        /** @var array<string> parameters name from the registered route */
         $pNames = $route->parameterNames();
 
         $hasModels = false;
 
         $this->handleParams($params, $pNames, $route, $rParams, $hasModels);
 
-        // If the route has no dynamic models as parameters
+        // If the route has no dynamic models as parameters.
         if (!count($params) or !$hasModels) {
-            $rName = $route->getName();
+            $rName           = $route->getName();
             $generatedUris[] = [
                 route($route->getName()),
                 self::getRouteFrequency($rName),
                 self::getRoutePriority($rName)
             ];
-        } else { // If the route has dynamic models as parameters
+        } else {
+            // If the route has dynamic models as parameters.
             $this->genRoute($route, $generatedUris, $rParams);
         }
     }
@@ -133,37 +147,34 @@ final class SitemapGenerator
     /**
      * Handle all route params
      *
-     * @param array $params
-     * @param array|null $pNames
-     * @param \Illuminate\Routing\Route $route
-     * @param array $rParams
-     * @param bool $hasModels
+     * @param array<\ReflectionParameter>                                                          $params
+     * @param array<string>|null                                                                   $pNames
+     * @param \Illuminate\Routing\Route                                                            $route
+     * @param array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable> $rParams
+     * @param boolean                                                                              $hasModels
      * @return void
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     * @throws \ReflectionException
-     * @throws \InvalidArgumentException
-     * @throws \Kwaadpepper\RefreshSitemap\Exceptions\SitemapException
+     * @throws SitemapException If a class on a route is not handled.
      */
     private function handleParams(
         array $params,
         array $pNames = null,
-        RoutingRoute $route,
+        \Illuminate\Routing\Route $route,
         array &$rParams,
         bool &$hasModels
     ) {
         foreach ($params as $param) {
 
-            /** @var ReflectionClass|null $name */
+            /** @var \ReflectionClass|null $name */
             $name = $param->getType() && !$param->getType()->isBuiltin()
-                ? new ReflectionClass($param->getType()->getName())
+                ? new \ReflectionClass($param->getType()->getName())
                 : null;
 
             /** @var string $pName $parameter name on route uri */
             $pName = '';
 
-            // If the route has parameters and the controller accepts it
+            // If the route has parameters and the controller accepts it.
             if (count($pNames) and \array_key_exists($param->getPosition(), $pNames)) {
-                // Get the controller parameter name for the route
+                // Get the controller parameter name for the route.
                 $pName = $pNames[$param->getPosition()];
             }
 
@@ -179,14 +190,14 @@ final class SitemapGenerator
                 ));
             }
 
-            // If We have a custom binder for this route
+            // If We have a custom binder for this route.
             if ($this->hasRouteBinderParam($route, $pName)) {
                 $hasModels = true;
                 $this->processWithRouteBinderParam($rParams, $route, $pName);
                 continue;
             }
 
-            // If This route takes a model as param
+            // If This route takes a model as param.
             if ($name and $name->isSubclassOf(Model::class)) {
                 $hasModels = true;
                 /** @var \string */
@@ -194,15 +205,17 @@ final class SitemapGenerator
                 $this->setParamsForModel($rParams, $modelClassName, $pName);
                 continue;
             }
-        }
+        } //end foreach
     }
 
     /**
      * Process route with binderParam
      *
+     * @param array        $rParams
      * @param RoutingRoute $route
-     * @param string $pName
+     * @param string       $pName
      * @return void
+     * @throws SitemapException If a class on a route is not handled.
      */
     private function processWithRouteBinderParam(array &$rParams, RoutingRoute $route, string $pName)
     {
@@ -212,7 +225,7 @@ final class SitemapGenerator
         $modelClassName = $o[0];
         /** @var \string  */
         $routeParamName = $o[1];
-        $rfLCls = (new ReflectionClass($modelClassName));
+        $rfLCls         = (new \ReflectionClass($modelClassName));
 
         switch (true) {
             case $rfLCls->isSubclassOf(Model::class):
@@ -231,7 +244,7 @@ final class SitemapGenerator
     /**
      * Set route param Array for Enums
      *
-     * @param array $rParams
+     * @param array  $rParams
      * @param string $enumClassName
      * @param string $pName
      * @return void
@@ -249,7 +262,7 @@ final class SitemapGenerator
     /**
      * Set route param Array for Models
      *
-     * @param array $rParams
+     * @param array  $rParams
      * @param string $modelClassName
      * @param string $pName
      * @param string $routeParamName
@@ -261,15 +274,15 @@ final class SitemapGenerator
         string $pName,
         string $routeParamName = null
     ) {
-        $i = 0;
+        $i     = 0;
         $limit = 10;
         /** @var string $modelTable */
-        $modelTable = (new ReflectionClass($modelClassName))->newInstanceWithoutConstructor()->getTable();
-        $q = $modelClassName::query();
+        $modelTable = (new \ReflectionClass($modelClassName))->newInstanceWithoutConstructor()->getTable();
+        $q          = $modelClassName::query();
         self::queryConditions($q, $modelTable);
         do {
             $results = $q->offset($i * $limit)->limit($limit)->get();
-            $length = count($results);
+            $length  = count($results);
             $results->map(function (Model $model) use (&$rParams, $pName, $routeParamName) {
                 if (!array_key_exists($pName, $rParams)) {
                     $rParams[$pName] = [];
@@ -283,9 +296,9 @@ final class SitemapGenerator
     /**
      * Recursively generate routes for all params
      *
-     * @param RoutingRoute $route
-     * @param array $generatedUris
-     * @param array $params
+     * @param RoutingRoute                      $route
+     * @param array<array[string,string,float]> $generatedUris
+     * @param array                             $params
      * @return void
      */
     private function genRoute(RoutingRoute $route, array &$generatedUris, array $params)
@@ -301,7 +314,7 @@ final class SitemapGenerator
             $filtered = array_key_last($params) === $pName ? true : false;
         }
         if ($filtered) {
-            $routeName = $route->getName();
+            $routeName       = $route->getName();
             $generatedUris[] = [
                 route($routeName, $params),
                 self::getRouteFrequency($routeName),

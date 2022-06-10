@@ -2,11 +2,10 @@
 
 namespace Kwaadpepper\RefreshSitemap\Exceptions;
 
-use Exception;
-
 /**
+ * Sitemap Excception for internal use
  * @inheritDoc
  */
-class SitemapException extends Exception
+class SitemapException extends \Exception
 {
 }

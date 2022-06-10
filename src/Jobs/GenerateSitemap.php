@@ -19,7 +19,12 @@ class GenerateSitemap implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public function handle()
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle(): void
     {
         $sitemapGenerator = new SitemapGenerator();
         Log::debug('Generating Sitemap..');
@@ -32,7 +37,7 @@ class GenerateSitemap implements ShouldQueue
         } catch (SitemapException $e) {
             Log::error('An error occured while generating sitemap');
             Log::error($e->getMessage());
-            Log::debug($e);
+            \report($e);
         }
         Log::debug('A new sitemap.xml was generated');
     }

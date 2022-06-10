@@ -4,21 +4,17 @@ namespace Kwaadpepper\RefreshSitemap;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
+use Kwaadpepper\RefreshSitemap\Console\Commands\RefreshSitemap;
 use Kwaadpepper\RefreshSitemap\Jobs\GenerateSitemap;
 
 class RefreshSitemapServiceProvider extends ServiceProvider
 {
-
-    protected $commands = [
-        'Kwaadpepper\RefreshSitemap\Console\Commands\RefreshSitemap'
-    ];
-
     /**
      * Bootstrap any application services.
      *
      * @return void
      */
-    public function boot()
+    public function boot(): void
     {
         $this->publishes([
             __DIR__ . '/../config' => \config_path(),
@@ -34,12 +30,19 @@ class RefreshSitemapServiceProvider extends ServiceProvider
         }
     }
 
-    public function register()
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register(): void
     {
         $this->mergeConfigFrom(
             \sprintf('%s/../config/refresh-sitemap.php', __DIR__),
             'refresh-sitemap'
         );
-        $this->commands($this->commands);
+        $this->commands([
+            RefreshSitemap::class
+        ]);
     }
 }
