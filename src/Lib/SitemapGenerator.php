@@ -3,8 +3,9 @@
 namespace Kwaadpepper\RefreshSitemap\Lib;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Route;
 use Kwaadpepper\Enum\BaseEnumRoutable;
 use Kwaadpepper\RefreshSitemap\Exceptions\SitemapException;
 use Kwaadpepper\RefreshSitemap\Traits\SitemapRouteBinder;
@@ -68,7 +69,10 @@ final class SitemapGenerator
         self::initConfig();
         $this->assertRouteBinderIsCorrect();
 
-        $routeCollection = Route::getRoutes();
+        /** @var \Illuminate\Routing\Router $router */
+        $router = app('router');
+
+        $routeCollection = $router->getRoutes();
 
         /**
          * @var array<array<int,string|float>>
@@ -160,7 +164,7 @@ final class SitemapGenerator
         \Illuminate\Routing\Route $route,
         bool &$hasModels
     ): array {
-        /** @var array Resolved parameters. */
+        /** @var array<string,array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved. */
         $rParams = [];
         foreach ($params as $param) {
             $name = null;
@@ -319,13 +323,41 @@ final class SitemapGenerator
             }
             $filtered = array_key_last($params) === $pName ? true : false;
         }
-        if ($filtered) {
+
+
+        if ($filtered and $this->routeBindingsCanBeResolved($route, $params)) {
             $routeName       = $route->getName();
             $generatedUris[] = [
                 route($routeName, $params),
                 self::getRouteFrequency($routeName),
                 self::getRoutePriority($routeName)
             ];
+        } //end if
+    }
+
+    /**
+     * Can route params be resolved ?
+     *
+     * @param \Illuminate\Routing\Route $route
+     * @param array                     $params
+     * @return boolean
+     */
+    private function routeBindingsCanBeResolved(\Illuminate\Routing\Route $route, array $params): bool
+    {
+        $routeName = $route->getName();
+        $request   = Request::create(route($routeName, $params));
+
+        $route = $route->bind($request);
+
+        /** @var \Illuminate\Routing\Router $router */
+        $router = app('router');
+
+        try {
+            $router->substituteBindings($route);
+            $router->substituteImplicitBindings($route);
+        } catch (ModelNotFoundException $e) {
+            return false;
         }
+        return true;
     }
 }
