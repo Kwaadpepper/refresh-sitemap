@@ -71,7 +71,7 @@ trait SitemapRouteBinder
      *
      * @param \Illuminate\Routing\Route $route
      * @param string                    $param
-     * @return array
+     * @return array<int, string>
      */
     private static function getRouteBinderParam(\Illuminate\Routing\Route $route, string $param): array
     {

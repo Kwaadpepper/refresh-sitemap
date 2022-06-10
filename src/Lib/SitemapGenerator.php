@@ -3,7 +3,6 @@
 namespace Kwaadpepper\RefreshSitemap\Lib;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Kwaadpepper\Enum\BaseEnumRoutable;
@@ -110,7 +109,7 @@ final class SitemapGenerator
     }
 
     /**
-     * Undocumented function
+     * Generate route uri for site map usage
      *
      * @param \Illuminate\Routing\Route         $route
      * @param array<array[string,string,float]> $generatedUris
@@ -128,7 +127,7 @@ final class SitemapGenerator
 
         $hasModels = false;
 
-        $this->handleParams($params, $pNames, $route, $rParams, $hasModels);
+        $rParams = $this->handleParams($params, $pNames, $route, $hasModels);
 
         // If the route has no dynamic models as parameters.
         if (!count($params) or !$hasModels) {
@@ -147,27 +146,27 @@ final class SitemapGenerator
     /**
      * Handle all route params
      *
-     * @param array<\ReflectionParameter>                                                          $params
-     * @param array<string>|null                                                                   $pNames
-     * @param \Illuminate\Routing\Route                                                            $route
-     * @param array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable> $rParams
-     * @param boolean                                                                              $hasModels
-     * @return void
+     * @param array<\ReflectionParameter> $params
+     * @param array<string>|null          $pNames
+     * @param \Illuminate\Routing\Route   $route
+     * @param boolean                     $hasModels
+     * phpcs:ignore Generic.Files.LineLength.TooLong
+     * @return array<string,array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved.
      * @throws SitemapException If a class on a route is not handled.
      */
     private function handleParams(
         array $params,
         array $pNames = null,
         \Illuminate\Routing\Route $route,
-        array &$rParams,
         bool &$hasModels
-    ) {
+    ): array {
+        /** @var array Resolved parameters. */
+        $rParams = [];
         foreach ($params as $param) {
-
-            /** @var \ReflectionClass|null $name */
-            $name = $param->getType() && !$param->getType()->isBuiltin()
-                ? new \ReflectionClass($param->getType()->getName())
-                : null;
+            $name = null;
+            if ($paramType = $param->getType() and !$paramType->isBuiltin()) {
+                $name = new \ReflectionClass($paramType->getName());
+            }
 
             /** @var string $pName $parameter name on route uri */
             $pName = '';
@@ -193,7 +192,7 @@ final class SitemapGenerator
             // If We have a custom binder for this route.
             if ($this->hasRouteBinderParam($route, $pName)) {
                 $hasModels = true;
-                $this->processWithRouteBinderParam($rParams, $route, $pName);
+                $rParams  += $this->processWithRouteBinderParam($route, $pName);
                 continue;
             }
 
@@ -202,80 +201,86 @@ final class SitemapGenerator
                 $hasModels = true;
                 /** @var \string */
                 $modelClassName = $name->getName();
-                $this->setParamsForModel($rParams, $modelClassName, $pName);
+                $rParams       += $this->setParamsForModel($modelClassName, $pName);
                 continue;
             }
         } //end foreach
+        return $rParams;
     }
 
     /**
      * Process route with binderParam
      *
-     * @param array        $rParams
-     * @param RoutingRoute $route
-     * @param string       $pName
-     * @return void
+     * @param \Illuminate\Routing\Route $route
+     * @param string                    $pName
+     * phpcs:ignore Generic.Files.LineLength.TooLong
+     * @return array<string,array<integer,string|\Illuminate\Database\Eloquent\Model|\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved.
      * @throws SitemapException If a class on a route is not handled.
      */
-    private function processWithRouteBinderParam(array &$rParams, RoutingRoute $route, string $pName)
+    private function processWithRouteBinderParam(\Illuminate\Routing\Route $route, string $pName): array
     {
+        /** @var array Resolved parameters. */
+        $rParams = [];
+
         $o = $this->getRouteBinderParam($route, $pName);
 
-        /** @var \string */
         $modelClassName = $o[0];
-        /** @var \string  */
         $routeParamName = $o[1];
         $rfLCls         = (new \ReflectionClass($modelClassName));
 
         switch (true) {
             case $rfLCls->isSubclassOf(Model::class):
-                $this->setParamsForModel($rParams, $modelClassName, $pName, $routeParamName);
+                $rParams = $this->setParamsForModel($modelClassName, $pName, $routeParamName);
                 break;
             case $rfLCls->isSubclassOf(BaseEnumRoutable::class):
-                $this->setParamForEnum($rParams, $rfLCls->getName(), $pName);
+                $rParams = $this->setParamForEnum($rfLCls->getName(), $pName);
                 break;
             default:
                 throw new SitemapException(trans('Unhandled class type :className', [
                     'className' => $rfLCls->getName()
                 ]));
         }
+        return $rParams;
     }
 
     /**
      * Set route param Array for Enums
      *
-     * @param array  $rParams
      * @param string $enumClassName
      * @param string $pName
-     * @return void
+     * @return array<string,array<integer,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved.
      */
-    private function setParamForEnum(array &$rParams, string $enumClassName, string $pName)
+    private function setParamForEnum(string $enumClassName, string $pName): array
     {
+        /** @var array Resolved parameters. */
+        $rParams = [];
         foreach (forward_static_call(sprintf('%s::toArray', $enumClassName)) as $enum) {
             if (!array_key_exists($pName, $rParams)) {
                 $rParams[$pName] = [];
             }
             $rParams[$pName][] = $enum->value;
         }
+        return $rParams;
     }
 
     /**
      * Set route param Array for Models
      *
-     * @param array  $rParams
      * @param string $modelClassName
      * @param string $pName
      * @param string $routeParamName
-     * @return void
+     * phpcs:ignore Generic.Files.LineLength.TooLong
+     * @return array<string,array<integer,string|\Illuminate\Database\Eloquent\Model>> List of parameters resolved.
      */
     private function setParamsForModel(
-        array &$rParams,
         string $modelClassName,
         string $pName,
         string $routeParamName = null
-    ) {
-        $i     = 0;
-        $limit = 10;
+    ): array {
+        /** @var array Resolved parameters. */
+        $rParams = [];
+        $i       = 0;
+        $limit   = 10;
         /** @var string $modelTable */
         $modelTable = (new \ReflectionClass($modelClassName))->newInstanceWithoutConstructor()->getTable();
         $q          = $modelClassName::query();
@@ -291,17 +296,18 @@ final class SitemapGenerator
             });
             $i++;
         } while ($length);
+        return $rParams;
     }
 
     /**
      * Recursively generate routes for all params
      *
-     * @param RoutingRoute                      $route
-     * @param array<array[string,string,float]> $generatedUris
-     * @param array                             $params
+     * @param \Illuminate\Routing\Route      $route
+     * @param array<array<int,string|float>> $generatedUris
+     * @param array                          $params
      * @return void
      */
-    private function genRoute(RoutingRoute $route, array &$generatedUris, array $params)
+    private function genRoute(\Illuminate\Routing\Route $route, array &$generatedUris, array $params)
     {
         $filtered = false;
         foreach ($params as $pName => $param) {
