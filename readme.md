@@ -15,9 +15,10 @@ $ composer require kwaadpepper/refresh-sitemap
 
 ## Usage
 
-1 - `php artisan vendor:publish --provider="Kwaadpepper\RefreshSitemap\RefreshSitemapServiceProvider"`
-2 - Change configuration in config/refresh-sitemap.php
-3 - You can test your configuration using `php artisan sitemap:refresh --dry-run`
+1. `php artisan vendor:publish --provider="Kwaadpepper\RefreshSitemap\RefreshSitemapServiceProvider"`
+
+2. Change configuration in `config/refresh-sitemap.php`
+3. You can test your configuration using `php artisan sitemap:refresh --dry-run`
 
 ## Change log
 
@@ -30,7 +31,6 @@ If you discover any security related issues, please email github@jeremydev.ovh i
 ## Credits
 
 - [Jérémy Munsch][link-author]
-- [All Contributors][link-contributors]
 
 ## License
 
