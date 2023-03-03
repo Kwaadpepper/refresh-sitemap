@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Kwaadpepper\Enum\BaseEnumRoutable;
 use Kwaadpepper\RefreshSitemap\Exceptions\SitemapException;
-use ReflectionClass;
 
 trait SitemapRouteBinder
 {
@@ -26,7 +25,21 @@ trait SitemapRouteBinder
      */
     private static function initConfigBinder(): void
     {
-        self::$routesBinder = \config('refresh-sitemap.routesBinder', self::$routesBinder);
+        self::$routesBinder = \collect(\config('refresh-sitemap.routesBinder', self::$routesBinder))
+            ->filter()->mapWithKeys(function ($value, $key) {
+                return [
+                    \strval($key) => \collect($value)->filter()->mapWithKeys(function ($value, $key) {
+                        return [
+                            \strval($key) => \collect($value)->filter()->map(function ($value) {
+                                if (!\is_string($value) and !\is_int($value)) {
+                                    throw new \Error('Wrong configuration on sitemap routesBinder');
+                                }
+                                return $value;
+                            })->all()
+                        ];
+                    })->all()
+                ];
+            })->all();
     }
 
     /**
@@ -107,7 +120,7 @@ trait SitemapRouteBinder
                 }
                 try {
                     /** @var object */
-                    $rfCls = (new ReflectionClass($p[0]))->newInstanceWithoutConstructor();
+                    $rfCls = (new \ReflectionClass($p[0]))->newInstanceWithoutConstructor();
                     if (is_subclass_of($rfCls, BaseEnumRoutable::class)) {
                         return;
                     }
