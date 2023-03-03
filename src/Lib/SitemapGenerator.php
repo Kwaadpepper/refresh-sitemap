@@ -121,12 +121,21 @@ final class SitemapGenerator
      */
     private function handleRoute(\Illuminate\Routing\Route $route, array &$generatedUris): void
     {
-        /** @var array<\ReflectionParameter> parameters signature from the controller */
-        $params = $route->signatureParameters();
-        /** @var array<string> parameters name from the registered route */
-        $pNames = $route->parameterNames();
+        /** @var \Illuminate\Support\Collection<\ReflectionParameter> parameters signature from the controller */
+        $params = collect($route->signatureParameters());
+        /** @var \Illuminate\Support\Collection<string> parameters name from the registered route */
+        $pNames = collect($route->parameterNames());
 
-        $this->handleParams($params, $pNames, $route, $generatedUris);
+        // * Filter controller params and keep only : either if is a LaravelModel or is declared as route parameter.
+        $params = \collect($params)->filter(function (\ReflectionParameter $param) use ($pNames) {
+            $extendsLaravelModel = false;
+            if ($paramType = $param->getType() and !$paramType->isBuiltin()) {
+                $extendsLaravelModel = (new \ReflectionClass($paramType->getName()))->isSubclassOf(Model::class);
+            }
+            return $extendsLaravelModel or $pNames->contains($param->getName());
+        });
+
+        $this->handleParams($params->all(), $pNames->all(), $route, $generatedUris);
     }
 
     /**
@@ -153,13 +162,13 @@ final class SitemapGenerator
         $rParamsNullable = [];
         foreach ($params as $param) {
             $name        = null;
-            $hasNullable = $hasNullable or $param->allowsNull();
+            $hasNullable = $hasNullable || $param->allowsNull();
             if ($paramType = $param->getType() and !$paramType->isBuiltin()) {
                 $name = new \ReflectionClass($paramType->getName());
             }
 
             /** @var string $pName $parameter name on route uri */
-            $pName = '';
+            $pName = $param->getName();
 
             // * If the route has parameters and the controller accepts it.
             if (count($pNames) and \array_key_exists($param->getPosition(), $pNames)) {
