@@ -153,7 +153,7 @@ final class SitemapGenerator
         $rParamsNullable = [];
         foreach ($params as $param) {
             $name        = null;
-            $hasNullable = $hasNullable ?: $param->allowsNull();
+            $hasNullable = $hasNullable or $param->allowsNull();
             if ($paramType = $param->getType() and !$paramType->isBuiltin()) {
                 $name = new \ReflectionClass($paramType->getName());
             }
@@ -161,47 +161,42 @@ final class SitemapGenerator
             /** @var string $pName $parameter name on route uri */
             $pName = '';
 
-            // If the route has parameters and the controller accepts it.
+            // * If the route has parameters and the controller accepts it.
             if (count($pNames) and \array_key_exists($param->getPosition(), $pNames)) {
                 // Get the controller parameter name for the route.
                 $pName = $pNames[$param->getPosition()];
             }
 
-            if (config('app.debug')) {
-                dump(\trans(
-                    // phpcs:ignore Generic.Files.LineLength.TooLong
-                    'Route name : :routeName, Param [type: :typeName, name: :paramName, binder: :hasBinder, nullable: :nullable]',
-                    [
-                        'routeName' => $route->getName(),
-                        'typeName' => $name ? $name->getName() : '',
-                        'paramName' => $pName,
-                        'hasBinder' => $this->hasRouteBinderParam($route, $pName) ? 'Yes' : 'No',
-                        'nullable' => $param->allowsNull() ? 'Yes' : 'No'
-                    ]
-                ));
-            }
+            $this->debugHandlingParams(
+                $route->getName(),
+                $name ? $name->getName() : '',
+                $pName,
+                $this->hasRouteBinderParam($route, $pName),
+                $param->allowsNull()
+            );
 
-            // If We have a custom binder for this route.
+            // * If We have a custom binder for this route.
             if ($this->hasRouteBinderParam($route, $pName)) {
                 $hasModels        = true;
                 $rParams         += $this->processWithRouteBinderParam($route, $pName);
-                $rParamsNullable += $param->allowsNull() ? [$pName => null] : $this->processWithRouteBinderParam($route, $pName);
+                $rParamsNullable += $param->allowsNull() ?
+                    [$pName => null] : $this->processWithRouteBinderParam($route, $pName);
                 continue;
             }
 
-            // If This route takes a model as param.
+            // * If This route takes a model as param.
             if ($name and $name->isSubclassOf(Model::class)) {
-                $hasModels = true;
-                /** @var \string */
+                $hasModels        = true;
                 $modelClassName   = $name->getName();
                 $rParams         += $this->setParamsForModel($modelClassName, $pName);
-                $rParamsNullable += $param->allowsNull() ? [$pName => null] : $this->setParamsForModel($modelClassName, $pName);
+                $rParamsNullable += $param->allowsNull() ?
+                    [$pName => null] : $this->setParamsForModel($modelClassName, $pName);
                 continue;
             }
         } //end foreach
 
 
-        // If the route has no dynamic models as parameters.
+        // * If the route has no dynamic models as parameters.
         if (!count($params) or !$hasModels) {
             $rName           = $route->getName();
             $generatedUris[] = [
@@ -211,10 +206,43 @@ final class SitemapGenerator
             ];
             return;
         }
-        // If the route has dynamic models as parameters.
+        // * If the route has dynamic models as parameters.
         $this->genRoute($route, $generatedUris, $rParams);
+        // * If then route has nullable parameters.
         if ($hasNullable) {
             $this->genRoute($route, $generatedUris, $rParamsNullable);
+        }
+    }
+
+    /**
+     * Print console debug
+     *
+     * @param string  $routeName
+     * @param string  $typeName
+     * @param string  $paramName
+     * @param boolean $hasBinder
+     * @param boolean $nullable
+     * @return void
+     */
+    private function debugHandlingParams(
+        string $routeName,
+        string $typeName,
+        string $paramName,
+        bool $hasBinder,
+        bool $nullable
+    ): void {
+        if (config('app.debug')) {
+            dump(\trans(
+                // phpcs:ignore Generic.Files.LineLength.TooLong
+                'Route name : :routeName, Param [type: :typeName, name: :paramName, binder: :hasBinder, nullable: :nullable]',
+                [
+                    'routeName' => $routeName,
+                    'typeName' => $typeName,
+                    'paramName' => $paramName,
+                    'hasBinder' => $hasBinder ? 'Yes' : 'No',
+                    'nullable' => $nullable ? 'Yes' : 'No'
+                ]
+            ));
         }
     }
 
