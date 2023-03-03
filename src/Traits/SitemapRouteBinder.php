@@ -3,6 +3,7 @@
 namespace Kwaadpepper\RefreshSitemap\Traits;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Kwaadpepper\Enum\BaseEnumRoutable;
@@ -14,7 +15,7 @@ trait SitemapRouteBinder
      * List of route with its corresponding parameter
      * arguments and models
      *
-     * @var array<string,array<string,array<int,string>>>
+     * @var \Illuminate\Support\Collection<string,\Illuminate\Support\Collection<string,array<int,string>>>
      */
     private static $routesBinder = [];
 
@@ -25,21 +26,23 @@ trait SitemapRouteBinder
      */
     private static function initConfigBinder(): void
     {
-        self::$routesBinder = \collect(\config('refresh-sitemap.routesBinder', self::$routesBinder))
-            ->filter()->mapWithKeys(function ($value, $key) {
-                return [
-                    \strval($key) => \collect($value)->filter()->mapWithKeys(function ($value, $key) {
-                        return [
-                            \strval($key) => \collect($value)->filter()->map(function ($value) {
-                                if (!\is_string($value) and !\is_int($value)) {
-                                    throw new \Error('Wrong configuration on sitemap routesBinder');
-                                }
-                                return $value;
-                            })->all()
-                        ];
-                    })->all()
-                ];
-            })->all();
+        self::$routesBinder = \collect(\config(
+            'refresh-sitemap.routesBinder',
+            self::$routesBinder
+        ))->filter()->mapWithKeys(function ($value, $key) {
+            return [
+                \strval($key) => \collect($value)->filter()->mapWithKeys(function ($value, $key) {
+                    return [
+                        \strval($key) => \collect($value)->filter()->map(function ($value) {
+                            if (!\is_string($value) and !\is_int($value)) {
+                                throw new \Error('Wrong configuration on sitemap routesBinder');
+                            }
+                            return $value;
+                        })->all()
+                    ];
+                })
+            ];
+        });
     }
 
     /**
@@ -50,7 +53,7 @@ trait SitemapRouteBinder
      */
     private static function hasRouteBinder(\Illuminate\Routing\Route $route): bool
     {
-        return array_key_exists($route->getName(), self::$routesBinder);
+        return self::$routesBinder->has($route->getName());
     }
 
     /**
@@ -63,7 +66,7 @@ trait SitemapRouteBinder
     private static function hasRouteBinderParam(\Illuminate\Routing\Route $route, string $param): bool
     {
         if (self::hasRouteBinder($route)) {
-            return array_key_exists($param, self::getRouteBinder($route));
+            return self::getRouteBinder($route)->has($param);
         }
         return false;
     }
@@ -72,11 +75,11 @@ trait SitemapRouteBinder
      * Get the routeBinder
      *
      * @param \Illuminate\Routing\Route $route
-     * @return array
+     * @return \Illuminate\Support\Collection<string,array<int,string>>
      */
-    private static function getRouteBinder(\Illuminate\Routing\Route $route): array
+    private static function getRouteBinder(\Illuminate\Routing\Route $route): Collection
     {
-        return self::$routesBinder[$route->getName()] ?? [];
+        return self::$routesBinder->get($route->getName(), \collect());
     }
 
     /**
@@ -84,11 +87,11 @@ trait SitemapRouteBinder
      *
      * @param \Illuminate\Routing\Route $route
      * @param string                    $param
-     * @return array<int, string>
+     * @return array<int,string>
      */
     private static function getRouteBinderParam(\Illuminate\Routing\Route $route, string $param): array
     {
-        return self::$routesBinder[$route->getName()][$param];
+        return self::getRouteBinder($route)->get($param, []);
     }
 
     /**
