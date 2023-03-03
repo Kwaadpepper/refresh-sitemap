@@ -285,8 +285,10 @@ final class SitemapGenerator
         $rParams = [];
         $i       = 0;
         $limit   = 10;
+        /** @var object */
+        $instance = (new \ReflectionClass($modelClassName))->newInstanceWithoutConstructor();
         /** @var string $modelTable */
-        $modelTable = (new \ReflectionClass($modelClassName))->newInstanceWithoutConstructor()->getTable();
+        $modelTable = $instance->getTable();
         $q          = $modelClassName::query();
         self::queryConditions($q, $modelTable);
         do {
@@ -324,9 +326,8 @@ final class SitemapGenerator
             $filtered = array_key_last($params) === $pName ? true : false;
         }
 
-
-        if ($filtered and $this->routeBindingsCanBeResolved($route, $params)) {
-            $routeName       = $route->getName();
+        // * Route name matches params
+        if ($filtered and $this->routeBindingsCanBeResolved($route, $params) and ($routeName = $route->getName())) {
             $generatedUris[] = [
                 route($routeName, $params),
                 self::getRouteFrequency($routeName),
@@ -344,8 +345,10 @@ final class SitemapGenerator
      */
     private function routeBindingsCanBeResolved(\Illuminate\Routing\Route $route, array $params): bool
     {
-        $routeName = $route->getName();
-        $request   = Request::create(route($routeName, $params));
+        if (!($routeName = $route->getName())) {
+            return false;
+        }
+        $request = Request::create(route($routeName, $params));
 
         $route = $route->bind($request);
 

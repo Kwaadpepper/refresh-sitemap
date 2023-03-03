@@ -106,6 +106,7 @@ trait SitemapRouteBinder
                     ));
                 }
                 try {
+                    /** @var object */
                     $rfCls = (new ReflectionClass($p[0]))->newInstanceWithoutConstructor();
                     if (is_subclass_of($rfCls, BaseEnumRoutable::class)) {
                         return;
