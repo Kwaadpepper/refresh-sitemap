@@ -121,53 +121,39 @@ final class SitemapGenerator
      */
     private function handleRoute(\Illuminate\Routing\Route $route, array &$generatedUris): void
     {
-        /** @var array to be populated with models from DB to generate a route */
-        $rParams = [];
-
         /** @var array<\ReflectionParameter> parameters signature from the controller */
         $params = $route->signatureParameters();
         /** @var array<string> parameters name from the registered route */
         $pNames = $route->parameterNames();
 
-        $hasModels = false;
-
-        $rParams = $this->handleParams($params, $pNames, $route, $hasModels);
-
-        // If the route has no dynamic models as parameters.
-        if (!count($params) or !$hasModels) {
-            $rName           = $route->getName();
-            $generatedUris[] = [
-                route($route->getName()),
-                self::getRouteFrequency($rName),
-                self::getRoutePriority($rName)
-            ];
-        } else {
-            // If the route has dynamic models as parameters.
-            $this->genRoute($route, $generatedUris, $rParams);
-        }
+        $this->handleParams($params, $pNames, $route, $generatedUris);
     }
 
     /**
      * Handle all route params
      *
-     * @param array<\ReflectionParameter> $params
-     * @param array<string>|null          $pNames
-     * @param \Illuminate\Routing\Route   $route
-     * @param boolean                     $hasModels
-     * phpcs:ignore Generic.Files.LineLength.TooLong
-     * @return array<string,array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved.
+     * @param array<\ReflectionParameter>       $params
+     * @param array<string>|null                $pNames
+     * @param \Illuminate\Routing\Route         $route
+     * @param array<array[string,string,float]> $generatedUris
+     * @return void
      * @throws SitemapException If a class on a route is not handled.
      */
     private function handleParams(
         array $params,
         array $pNames = null,
         \Illuminate\Routing\Route $route,
-        bool &$hasModels
-    ): array {
+        array &$generatedUris
+    ): void {
+        $hasModels   = false;
+        $hasNullable = false;
         /** @var array<string,array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved. */
         $rParams = [];
+        /** @var array<string,array<string,\Illuminate\Database\Eloquent\Model,\Kwaadpepper\Enum\BaseEnumRoutable>> List of parameters resolved. */
+        $rParamsNullable = [];
         foreach ($params as $param) {
-            $name = null;
+            $name        = null;
+            $hasNullable = $hasNullable ?: $param->allowsNull();
             if ($paramType = $param->getType() and !$paramType->isBuiltin()) {
                 $name = new \ReflectionClass($paramType->getName());
             }
@@ -183,20 +169,23 @@ final class SitemapGenerator
 
             if (config('app.debug')) {
                 dump(\trans(
-                    'Route name : :routeName, Param [type: :typeName, name: :paramName, binder: :hasBinder]',
+                    // phpcs:ignore Generic.Files.LineLength.TooLong
+                    'Route name : :routeName, Param [type: :typeName, name: :paramName, binder: :hasBinder, nullable: :nullable]',
                     [
                         'routeName' => $route->getName(),
                         'typeName' => $name ? $name->getName() : '',
                         'paramName' => $pName,
-                        'hasBinder' => $this->hasRouteBinderParam($route, $pName) ? 'true' : 'false'
+                        'hasBinder' => $this->hasRouteBinderParam($route, $pName) ? 'Yes' : 'No',
+                        'nullable' => $param->allowsNull() ? 'Yes' : 'No'
                     ]
                 ));
             }
 
             // If We have a custom binder for this route.
             if ($this->hasRouteBinderParam($route, $pName)) {
-                $hasModels = true;
-                $rParams  += $this->processWithRouteBinderParam($route, $pName);
+                $hasModels        = true;
+                $rParams         += $this->processWithRouteBinderParam($route, $pName);
+                $rParamsNullable += $param->allowsNull() ? [$pName => null] : $this->processWithRouteBinderParam($route, $pName);
                 continue;
             }
 
@@ -204,12 +193,29 @@ final class SitemapGenerator
             if ($name and $name->isSubclassOf(Model::class)) {
                 $hasModels = true;
                 /** @var \string */
-                $modelClassName = $name->getName();
-                $rParams       += $this->setParamsForModel($modelClassName, $pName);
+                $modelClassName   = $name->getName();
+                $rParams         += $this->setParamsForModel($modelClassName, $pName);
+                $rParamsNullable += $param->allowsNull() ? [$pName => null] : $this->setParamsForModel($modelClassName, $pName);
                 continue;
             }
         } //end foreach
-        return $rParams;
+
+
+        // If the route has no dynamic models as parameters.
+        if (!count($params) or !$hasModels) {
+            $rName           = $route->getName();
+            $generatedUris[] = [
+                route($route->getName()),
+                self::getRouteFrequency($rName),
+                self::getRoutePriority($rName)
+            ];
+            return;
+        }
+        // If the route has dynamic models as parameters.
+        $this->genRoute($route, $generatedUris, $rParams);
+        if ($hasNullable) {
+            $this->genRoute($route, $generatedUris, $rParamsNullable);
+        }
     }
 
     /**
