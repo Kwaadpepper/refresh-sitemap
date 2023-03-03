@@ -12,6 +12,8 @@ return [
      * For example, if you want to ignore all routes
      * of the backoffice group
      * just add '/backoffice' into this table
+     *
+     * * Note that this can take route names or route urls (both partially)
      */
     'ignoreRoutes' => [],
 

@@ -3,7 +3,6 @@
 namespace Kwaadpepper\RefreshSitemap\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Schema;
 
 trait SitemapRouteConditions
@@ -12,7 +11,7 @@ trait SitemapRouteConditions
      * List eloquent condition to decide whether
      * a route should appear in the sitemap or not
      *
-     * @var array<string,string>
+     * @var \Illuminate\Support\Collection<string,string|boolean>
      */
     private static $queryConditions = [];
 
@@ -20,7 +19,7 @@ trait SitemapRouteConditions
      * List of routes that should be ignored
      * when generating sitemap
      *
-     * @var array<string>
+     * @var \Illuminate\Support\Collection<string>
      */
     private static $ignoreRoutes = [];
 
@@ -31,8 +30,24 @@ trait SitemapRouteConditions
      */
     private static function initConfigConditions(): void
     {
-        self::$ignoreRoutes    = \config('refresh-sitemap.ignoreRoutes', self::$ignoreRoutes);
-        self::$queryConditions = \config('refresh-sitemap.queryConditions', self::$queryConditions);
+        self::$ignoreRoutes    = \collect(\config('refresh-sitemap.ignoreRoutes', self::$ignoreRoutes))
+            ->map(function ($value) {
+                if (!\is_string($value)) {
+                    throw new \Error('ignoreRoutes can take only string with route name or url');
+                }
+                return $value;
+            });
+        self::$queryConditions = \collect(\config('refresh-sitemap.queryConditions', self::$queryConditions))
+        ->mapWithKeys(function ($value, $index) {
+            if (!\is_string($index) or !(\is_string($value) || \is_bool($value))) {
+                throw new \Error(
+                    'queryConditions can take only and array with array<string,string|boolean>'
+                );
+            }
+            return [
+                $index => $value
+            ];
+        });
     }
 
     /**
@@ -41,21 +56,22 @@ trait SitemapRouteConditions
      * @param string                                $modelTable
      * @return void
      */
-    private static function queryConditions(Builder &$query, string $modelTable): void
+    private static function queryConditions(Builder $query, string $modelTable): void
     {
         foreach (self::$queryConditions as $tableColumn => $expectedValue) {
-            $query = Schema::hasColumn($modelTable, $tableColumn) ?
-                $query->where($tableColumn, $expectedValue) : $query;
+            if (Schema::hasColumn($modelTable, $tableColumn)) {
+                $query->where($tableColumn, $expectedValue);
+            }
         }
     }
 
     /**
      * Check if the route handles the HTTP GET method
      *
-     * @param RoutingRoute $route
+     * @param \Illuminate\Routing\Route $route
      * @return boolean
      */
-    private static function routeHandlesGetMethod(RoutingRoute $route): bool
+    private static function routeHandlesGetMethod(\Illuminate\Routing\Route $route): bool
     {
         return in_array('GET', $route->methods());
     }
@@ -65,21 +81,24 @@ trait SitemapRouteConditions
      * a partial uri from the table
      * Check also if it uses middleware auth
      *
-     * @param RoutingRoute $route
+     * ! Routes with auth middleware will be automatically ignored.
+     *
+     * @param \Illuminate\Routing\Route $route
      * @return boolean
      */
-    private static function routeShouldBeIgnored(RoutingRoute $route): bool
+    private static function routeShouldBeIgnored(\Illuminate\Routing\Route $route): bool
     {
-        foreach (self::$ignoreRoutes as $iRoute) {
-            if (strpos($route->uri(), ltrim($iRoute, '/')) === 0) {
-                return true;
-            }
-        }
-        foreach ($route->middleware() as $middleware) {
-            if (strpos($middleware, 'auth') === 0) {
-                return true;
-            }
-        }
-        return false;
+        return self::$ignoreRoutes->reduce(function ($carry, $iRoute) use ($route) {
+            // * Check match route url or name
+            /** @var boolean|null $carry */
+            /** @var string $iRoute Can be route url or route name */
+            return $carry or (strpos($route->uri(), ltrim($iRoute, '/')) === 0) or
+            (strpos(\strval($route->getName()), $iRoute) === 0);
+        }) || collect($route->middleware())->reduce(function ($carry, $middleware) {
+            // * Check route does not have auth middleware
+            /** @var boolean|null $carry */
+            /** @var string $middleware */
+            return $carry or (strpos(\strval($middleware), 'auth') === 0);
+        });
     }
 }
