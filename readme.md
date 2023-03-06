@@ -5,6 +5,8 @@
 
 Creates sitemap.xml and refresh using a config file
 
+## **New Ignore routes can now take route names instead of urls**
+
 ## Installation
 
 Via Composer
