@@ -216,7 +216,13 @@ final class SitemapGenerator
 
         // * If the route has no dynamic models as parameters.
         if (!count($params) or !$hasModels) {
-            $rName           = $route->getName();
+            $rName = $route->getName();
+            if (!$route->getName()) {
+                if (\config('app.debug')) {
+                    \dump(\sprintf('Ignore unamed route %s', $route->getActionName()));
+                }
+                return;
+            }
             $generatedUris[] = [
                 route($route->getName()),
                 self::getRouteFrequency($rName),
