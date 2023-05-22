@@ -15,13 +15,12 @@
         "Sitemap"
     ],
     "require": {
-        "illuminate/support": "~8",
-        "laravel/framework": "~8",
-        "kwaadpepper/enum": "~2",
-        "spatie/laravel-sitemap": "^5.8"
+        "illuminate/support": "~10",
+        "laravel/framework": "~10",
+        "spatie/laravel-sitemap": "^6.0"
     },
     "require-dev": {
-        "slevomat/coding-standard": "^7.2"
+        "slevomat/coding-standard": "^8.11"
     },
     "autoload": {
         "psr-4": {
