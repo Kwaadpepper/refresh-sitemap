@@ -36,7 +36,7 @@ trait SitemapRouteConditions
                     throw new \Error('ignoreRoutes can take only string with route name or url');
                 }
                 return $value;
-            });
+            })->concat(static::$defaultIgnoreRoutes);
         self::$queryConditions = \collect(\config('refresh-sitemap.queryConditions', self::$queryConditions))
         ->mapWithKeys(function ($value, $index) {
             if (!\is_string($index) or !(\is_string($value) || \is_bool($value))) {

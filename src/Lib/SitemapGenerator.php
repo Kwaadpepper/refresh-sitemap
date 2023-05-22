@@ -24,6 +24,15 @@ final class SitemapGenerator
     private $siteMap = null;
 
     /**
+     * Default routes to ignore
+     *
+     * @var string[]
+     */
+    private static $defaultIgnoreRoutes = [
+        'ignition.'
+    ];
+
+    /**
      * SitemapGenerator
      */
     public function __construct()
